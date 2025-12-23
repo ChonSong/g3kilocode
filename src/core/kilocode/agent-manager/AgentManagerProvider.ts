@@ -14,6 +14,7 @@ import {
 import { findKilocodeCli, type CliDiscoveryResult } from "./CliPathResolver"
 import { canInstallCli, getCliInstallCommand, getLocalCliInstallCommand, getLocalCliBinDir } from "./CliInstaller"
 import { CliProcessHandler, type CliProcessHandlerCallbacks } from "./CliProcessHandler"
+import { G3ProcessHandler, type G3ProcessHandlerCallbacks } from "./G3ProcessHandler"
 import type { StreamEvent, KilocodeStreamEvent, KilocodePayload, WelcomeStreamEvent } from "./CliOutputParser"
 import { extractRawText, tryParsePayloadJson } from "./askErrorParser"
 import { RemoteSessionService } from "./RemoteSessionService"
@@ -55,6 +56,7 @@ export class AgentManagerProvider implements vscode.Disposable {
 	private registry: AgentRegistry
 	private remoteSessionService: RemoteSessionService
 	private processHandler: CliProcessHandler
+	private g3ProcessHandler: G3ProcessHandler
 	private eventProcessor: KilocodeEventProcessor
 	private terminalManager: SessionTerminalManager
 	private sessionMessages: Map<string, ClineMessage[]> = new Map()
@@ -151,6 +153,13 @@ export class AgentManagerProvider implements vscode.Disposable {
 		}
 
 		this.processHandler = new CliProcessHandler(this.registry, callbacks)
+
+		const g3Callbacks: G3ProcessHandlerCallbacks = {
+			...callbacks,
+			onStatusMessage: (sessionId, message) => this.outputChannel.appendLine(`[G3-${sessionId}] ${message}`)
+		}
+		this.g3ProcessHandler = new G3ProcessHandler(this.registry, g3Callbacks)
+
 		this.eventProcessor = new KilocodeEventProcessor({
 			processHandler: this.processHandler,
 			registry: this.registry,
@@ -228,7 +237,7 @@ export class AgentManagerProvider implements vscode.Disposable {
 		}
 	}
 
-	private handleMessage(message: { type: string; [key: string]: unknown }): void {
+	private handleMessage(message: { type: string;[key: string]: unknown }): void {
 		this.outputChannel.appendLine(`Agent Manager received message: ${JSON.stringify(message)}`)
 
 		try {
@@ -521,24 +530,42 @@ export class AgentManagerProvider implements vscode.Disposable {
 			apiConfiguration = await this.getApiConfigurationForCli()
 		} catch (error) {
 			this.outputChannel.appendLine(
-				`[AgentManager] Failed to read provider settings for CLI: ${
-					error instanceof Error ? error.message : String(error)
+				`[AgentManager] Failed to read provider settings for CLI: ${error instanceof Error ? error.message : String(error)
 				}`,
 			)
 		}
 
-		this.processHandler.spawnProcess(
-			cliDiscovery.cliPath,
-			workspaceFolder,
-			prompt,
-			{ ...options, apiConfiguration, shellPath: cliDiscovery.shellPath },
-			(sid, event) => {
-				if (!this.processStartTimes.has(sid)) {
-					this.processStartTimes.set(sid, processStartTime)
+		const g3Enabled = vscode.workspace.getConfiguration("kilo-code").get<boolean>("g3.enabled")
+		if (g3Enabled) {
+			const binaryPath = vscode.workspace.getConfiguration("kilo-code").get<string>("g3.binaryPath") || "g3"
+
+			this.outputChannel.appendLine(`[AgentManager] Spawning G3 agent: ${binaryPath}`)
+			this.g3ProcessHandler.spawnProcess(
+				binaryPath,
+				workspaceFolder,
+				prompt,
+				{ ...options, apiConfiguration },
+				(sid, event) => {
+					if (!this.processStartTimes.has(sid)) {
+						this.processStartTimes.set(sid, processStartTime)
+					}
+					this.handleCliEvent(sid, event)
 				}
-				this.handleCliEvent(sid, event)
-			},
-		)
+			)
+		} else {
+			this.processHandler.spawnProcess(
+				cliDiscovery.cliPath,
+				workspaceFolder,
+				prompt,
+				{ ...options, apiConfiguration, shellPath: cliDiscovery.shellPath },
+				(sid, event) => {
+					if (!this.processStartTimes.has(sid)) {
+						this.processStartTimes.set(sid, processStartTime)
+					}
+					this.handleCliEvent(sid, event)
+				},
+			)
+		}
 
 		return true
 	}

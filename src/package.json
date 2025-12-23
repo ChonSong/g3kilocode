@@ -522,6 +522,16 @@
 					],
 					"description": "%commands.allowedCommands.description%"
 				},
+				"kilo-code.g3.binaryPath": {
+					"type": "string",
+					"default": "g3",
+					"description": "Path to the G3 binary."
+				},
+				"kilo-code.g3.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable G3 agent functionality."
+				},
 				"kilo-code.deniedCommands": {
 					"type": "array",
 					"items": {

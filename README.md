@@ -34,6 +34,18 @@
 - **MCP Server Marketplace**: Kilo can easily find, and use MCP servers to extend the agent capabilities.
 - **Multi Mode**: Plan with Architect, Code with Coder, and Debug with Debugger, and make your own custom modes.
 
+## G3 Integration (Preview)
+
+Kilo Code supports integration with the G3 Rust-based AI agent for autonomous coding tasks.
+
+### Usage
+
+1.  **Enable G3**: Open VS Code Settings and check `Kilocode > G3: Enabled` (or set `"kilocode.g3.enabled": true` in `settings.json`).
+2.  **Configure Binary**: Set the path to your G3 executable in `Kilocode > G3: Binary Path` (default: `g3`).
+3.  **Start Coding**: Launch a task as usual. Kilo will now use the G3 agent to drive the session.
+
+*Note: You must have the `g3` binary installed on your system.*
+
 ## How to get started with Kilo
 
 1. Install the Kilo Code extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code).
